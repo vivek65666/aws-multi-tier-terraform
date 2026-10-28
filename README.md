@@ -1,136 +1,96 @@
 # Multi-Tier Architecture on AWS using Terraform
 
-Deploy a scalable and resilient multi-tier architecture on AWS using Terraform.
+Terraform code to provision a three-tier architecture (web, application and database) on AWS, with load balancing and auto scaling on the web and application tiers.
 
-## Project Overview
+## Architecture
 
-This project allows us to deploy a highly available, scalable, and secure multi-tier architecture on Amazon Web Services (AWS) using Terraform. The architecture consists of the following three tiers:
+```
+Internet
+   |
+[ Web ALB ]  (public subnets)
+   |
+[ Web Auto Scaling Group ]  (web subnets)
+   |
+[ App ALB ]  (internal)
+   |
+[ App Auto Scaling Group ]  (private app subnets)
+   |
+[ RDS Database ]  (private DB subnets)
+```
 
-- **Web Tier**: This tier handles incoming user requests and can be horizontally scaled for increased capacity. It typically includes web servers and a load balancer for distributing traffic.
+<!-- Add your architecture diagram here: ![Architecture](images/architecture.png) -->
 
-- **Application Tier**: Application servers run our business logic and interact with the database tier. They can also be horizontally scaled to meet demand.
+| Tier | Components |
+|------|------------|
+| Web | Application Load Balancer, target group, launch template, Auto Scaling group |
+| Application | Application Load Balancer, target group, launch template, Auto Scaling group |
+| Database | Amazon RDS instance in a private DB subnet group |
+| Networking | VPC, public and private subnets, Internet Gateway, NAT Gateway, Elastic IP, route tables |
+| Security | Separate security groups for each ALB, each Auto Scaling group and the database |
 
-- **Database Tier**: The database stores and manages our application data. In this architecture, we use Amazon RDS for a managed database service.
+## Security Design
 
-## Architecture Diagram
-![multi-tier-architecture](https://github.com/mathesh-me/multi-tier-architecture-using-terraform/assets/144098846/14aeb752-ba87-4f51-87d5-bcf3000ee455)
+- Only the web load balancer accepts traffic from the internet.
+- Each tier accepts traffic only from the tier in front of it, enforced with security groups.
+- The database sits in private subnets and is reachable only from the application tier.
+- Private instances reach the internet through the NAT Gateway.
 
+## Project Structure
 
-## Getting Started
+| File | Purpose |
+|------|---------|
+| `provider.tf` | AWS provider configuration |
+| `backend.tf` | Terraform state backend |
+| `variables.tf` | Input variables |
+| `output.tf` | Output values |
+| `vpc.tf` | VPC |
+| `web-subnets.tf`, `app-subnets.tf`, `db-subnets.tf` | Subnets for each tier |
+| `internet-gateway.tf`, `nat-gw.tf`, `eip.tf` | Internet and NAT connectivity |
+| `public-route-table.tf`, `private-route-table.tf` | Routing |
+| `alb-web.tf`, `alb-app.tf` | Load balancers |
+| `tg-web.tf`, `tg-app.tf` | Target groups |
+| `launch-template-web.tf`, `launch-template-app.tf` | Launch templates |
+| `asg-web.tf`, `asg-app.tf` | Auto Scaling groups |
+| `alb-web-sg.tf`, `alb-app-sg.tf`, `asg-web-sg.tf`, `asg-app-sg.tf`, `db-sg.tf` | Security groups |
+| `db-subnet-group.tf`, `rds.tf` | Database |
+| `user-data.sh` | Instance bootstrap script |
 
-### Prerequisites
+## Prerequisites
 
-Before you get started, make sure you have the following prerequisites in place:
-
-- [Terraform](https://www.terraform.io/) installed.
-- AWS IAM credentials configured.
-- Git for cloning the repository.
-
-## Table of Contents
-
-- [Features](#features)
-- [Web Tier](#web-tier)
-- [Application Tier](#application-tier)
-- [Database Tier](#database-tier)
-- [Terraform Configuration](#terraform-configuration)
-- [Deployment](#deployment)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
-
-## Features
-
-- **High Availability**: The architecture is designed for fault tolerance and redundancy.
-- **Scalability**: Easily scale the web and application tiers to handle varying workloads.
-- **Security**: Security groups and network ACLs are configured to ensure a secure environment.
-
-## Web Tier
-
-The Web Tier is the entry point for incoming user requests. It typically includes:
-
-- **Load Balancer**: Distributes traffic across multiple web servers.
-- **Auto Scaling**: Automatically adjusts the number of web servers based on traffic.
-- **Security Groups**: Controls incoming and outgoing traffic to the web servers.
-
-### Web Tier Configuration
-
-- [Launch Template Configuration](launch-template-web.tf)
-- [Load Balancer Configuration](alb-web.tf)
-- [Auto Scaling Configuration](asg-web.tf)
-- [Security Group Configuration of Load balancer](alb-web-sg.tf)
-- [Security Group Configuration of Auto Scaling Group](asg-web-sg.tf)
-
-## Application Tier
-
-The Application Tier hosts the application servers responsible for running business logic and interacting with the database tier. Key components include:
-
-- **Application Servers**: These run your application code and can be horizontally scaled.
-- **Load Balancer**: Distributes traffic to the application servers.
-- **Auto Scaling**: Automatically adjusts the number of web servers based on traffic.
-- **Security Groups**: Controls incoming and outgoing traffic to the application servers.
-
-### Application Tier Configuration
-
-- [Launch Template Configuration](launch-template-app.tf)
-- [Load Balancer Configuration](alb-app.tf)
-- [Auto Scaling Configuration](asg-app.tf)
-- [Security Group Configuration of Load balancer](alb-app-sg.tf)
-- [Security Group Configuration of Auto Scaling Group](asg-app-sg.tf)
-
-## Database Tier
-
-The Database Tier stores and manages our application data. We use Amazon RDS for a managed database service. Key components include:
-
-- **Amazon RDS**: A managed database service for MySQL/PostgreSQL/SQL Server databases.
-- **Security Groups**: Control incoming and outgoing traffic to the database.
-
-### Database Tier Configuration
-
-- [DB Subnet group Configuration](db-subnet-group.tf)
-- [Amazon RDS Configuration](rds.tf)
-- [Security Group Configuration](db-sg.tf)
-
-## Terraform Configuration
-
-The Terraform configuration for this project is organized into different and resources to create the necessary AWS infrastructure components. Key resources include:
-
-- Virtual Private Cloud (VPC)
-- Subnets and Route Tables
-- Security Groups and Network ACLs
-- Load Balancers
-- Auto Scaling Groups
-- RDS Database Instances
+- [Terraform](https://developer.hashicorp.com/terraform/install) installed
+- An AWS account with IAM credentials configured (`aws configure`)
+- Git
 
 ## Deployment
 
-Follow these steps to deploy the architecture:
+```bash
+git clone https://github.com/vivek65666/aws-multi-tier-terraform.git
+cd aws-multi-tier-terraform
 
-1. Clone the repository:
+terraform init
+terraform plan
+terraform apply
+```
 
-   ```bash
-   git clone https://github.com/mathesh-me/multi-tier-architecture-using-terraform.git
-   ```
+Review the plan before confirming. Update `variables.tf` (region, instance type, database settings) to suit your needs. Do not commit passwords or secrets. Pass them through environment variables or a `terraform.tfvars` file that is listed in `.gitignore`.
 
-2. Make changes as per your needs.
-3. Initialize Terraform and apply the configuration:
-   ```
-   terraform init
-   ```
-4. Review the changes and confirm.
+## Cleanup
 
-## Usage
+```bash
+terraform destroy
+```
 
-### Scaling
-- To scale the Web or Application Tier, use Auto Scaling configurations provided in the respective Terraform files. Adjust the desired capacity to match your scaling requirements.
-### Database Management
-- Access the Amazon RDS instance in the Database Tier to manage your data.
-### Load Balancing
-- Configure the load balancer in the Web and Application Tiers to distribute traffic evenly.
-### Security Considerations
-- Review and customize the security groups and network ACLs to meet your specific security requirements.
+## Cost Warning
 
-## Contributing
-Contributions are Welcome! Please read my Contributing Guidelines to get started with contributing to this project.
+The NAT Gateway, load balancers and RDS instance are billed while they run. Run `terraform destroy` when you finish testing.
+
+## What I Learned
+
+- Designing a VPC with separate public and private subnets
+- Placing load balancers and Auto Scaling groups across tiers
+- Controlling traffic between tiers with security groups
+- Splitting Terraform code into files and using variables and outputs
 
 ## License
-This project is licensed under the MIT License.
+
+MIT
